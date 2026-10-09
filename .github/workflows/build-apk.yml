@@ -22,23 +22,26 @@ jobs:
           channel: stable
           flutter-version: '3.24.5'
           cache: true
-      - name: Gerar estrutura Android (se não existir)
+      - name: Gerar estrutura Android limpa
         run: |
-          if [ ! -f android/gradlew ]; then
-            mkdir -p /tmp/bak
-            cp -r lib /tmp/bak/lib
-            cp pubspec.yaml /tmp/bak/pubspec.yaml
-            if [ -f android/app/src/main/AndroidManifest.xml ]; then
-              cp android/app/src/main/AndroidManifest.xml /tmp/bak/AndroidManifest.xml
-            fi
-            flutter create --platforms=android --org br.com.combustivel --project-name combustivel_sp .
-            rm -rf lib
-            cp -r /tmp/bak/lib lib
-            cp /tmp/bak/pubspec.yaml pubspec.yaml
-            if [ -f /tmp/bak/AndroidManifest.xml ]; then
-              cp /tmp/bak/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-            fi
+          mkdir -p /tmp/bak
+          # Guarda o ficheiro de permissões atual
+          if [ -f android/app/src/main/AndroidManifest.xml ]; then
+            cp android/app/src/main/AndroidManifest.xml /tmp/bak/AndroidManifest.xml
           fi
+          
+          # Apaga a pasta incompleta
+          rm -rf android
+          
+          # Cria uma nova estrutura completa
+          flutter create --platforms=android --org br.com.combustivel --project-name combustivel_sp .
+          
+          # Restaura o ficheiro de permissões original
+          if [ -f /tmp/bak/AndroidManifest.xml ]; then
+            cp /tmp/bak/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          fi
+          
+          # Remove o ficheiro de teste padrão para evitar conflitos
           rm -f test/widget_test.dart
       - name: Dependências
         run: flutter pub get
