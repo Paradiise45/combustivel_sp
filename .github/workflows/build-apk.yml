@@ -38,10 +38,18 @@ jobs:
           
           rm -f test/widget_test.dart
           
-          # Força as variáveis que o geolocator precisa para não falhar
+          # Força as variáveis de versão do SDK
           echo "flutter.compileSdkVersion=34" >> android/local.properties
           echo "flutter.minSdkVersion=21" >> android/local.properties
           echo "flutter.targetSdkVersion=34" >> android/local.properties
+          
+          # Corrige a versão do Kotlin para a 1.9.24
+          if [ -f android/settings.gradle ]; then
+            sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/g' android/settings.gradle
+          fi
+          if [ -f android/build.gradle ]; then
+            sed -i -E "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.24'/g" android/build.gradle
+          fi
       - name: Atualizar dependências
         run: flutter pub upgrade
       - name: Compilar APK release
