@@ -20,31 +20,30 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.24.5'
+          flutter-version: '3.22.3'
           cache: true
-      - name: Gerar estrutura Android limpa
+      - name: Gerar estrutura Android limpa e propriedades
         run: |
           mkdir -p /tmp/bak
-          # Guarda o ficheiro de permissões atual
           if [ -f android/app/src/main/AndroidManifest.xml ]; then
             cp android/app/src/main/AndroidManifest.xml /tmp/bak/AndroidManifest.xml
           fi
           
-          # Apaga a pasta incompleta
           rm -rf android
-          
-          # Cria uma nova estrutura completa
           flutter create --platforms=android --org br.com.combustivel --project-name combustivel_sp .
           
-          # Restaura o ficheiro de permissões original
           if [ -f /tmp/bak/AndroidManifest.xml ]; then
             cp /tmp/bak/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           fi
           
-          # Remove o ficheiro de teste padrão para evitar conflitos
           rm -f test/widget_test.dart
-      - name: Dependências
-        run: flutter pub get
+          
+          # Força as variáveis que o geolocator precisa para não falhar
+          echo "flutter.compileSdkVersion=34" >> android/local.properties
+          echo "flutter.minSdkVersion=21" >> android/local.properties
+          echo "flutter.targetSdkVersion=34" >> android/local.properties
+      - name: Atualizar dependências
+        run: flutter pub upgrade
       - name: Compilar APK release
         run: flutter build apk --release
       - name: Guardar como artefato
@@ -52,7 +51,7 @@ jobs:
         with:
           name: combustivel-sp-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-      - name: Publicar em Releases (link direto)
+      - name: Publicar em Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
