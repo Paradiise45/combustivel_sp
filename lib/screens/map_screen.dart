@@ -1,121 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/posto_model.dart';
-import '../models/teste_combustivel_model.dart';
-import '../services/posto_repository.dart';
-import '../widgets/posto_detalhes_sheet.dart';
-import '../widgets/status_visual.dart';
-import 'nova_avaliacao_screen.dart';
+import '../services/overpass_service.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
-
+class MapaScreen extends StatefulWidget {
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  _MapaScreenState createState() => _MapaScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
-  static const LatLng _centroSp = LatLng(-23.5505, -46.6333);
+class _MapaScreenState extends State<MapaScreen> {
   final MapController _mapController = MapController();
-  final PostoRepository _repo = PostoRepository.instance;
-  LatLng? _posicao;
-  bool _mapaPronto = false;
-  bool _buscandoGps = false;
+  LatLng _centroMapa = const LatLng(-23.5505, -46.6333); // Inicia em SP
+  List<Posto> _postos = [];
+  bool _carregando = false;
 
   @override
   void initState() {
     super.initState();
-    _localizarUsuario();
+    _obterLocalizacaoAtual();
   }
 
-  @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
+  Future<void> _obterLocalizacaoAtual() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    Position position = await Geolocator.getCurrentPosition();
+    setState(() {
+      _centroMapa = LatLng(position.latitude, position.longitude);
+    });
+    _mapController.move(_centroMapa, 15.0);
+    _buscarPostosNaRegiao();
   }
 
-  Future<void> _localizarUsuario() async {
-    setState(() => _buscandoGps = true);
-    String? erro;
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        erro = 'Ative o GPS do aparelho para ver os postos perto de você.';
-      } else {
-        var perm = await Geolocator.checkPermission();
-        if (perm == LocationPermission.denied) {
-          perm = await Geolocator.requestPermission();
-        }
-        if (perm == LocationPermission.denied ||
-            perm == LocationPermission.deniedForever) {
-          erro = 'Permissão de localização negada. Libere nas configurações do aplicativo.';
-        } else {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              timeLimit: Duration(seconds: 20),
-            ),
-          );
-          _posicao = LatLng(pos.latitude, pos.longitude);
-        }
-      }
-    } catch (_) {
-      erro = 'Não foi possível obter sua localização.';
-    }
-    if (!mounted) return;
-    setState(() => _buscandoGps = false);
-    if (_posicao != null && _mapaPronto) {
-      _mapController.move(_posicao!, 14);
-    }
-    if (erro != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(erro)));
-    }
+  Future<void> _buscarPostosNaRegiao() async {
+    setState(() => _carregando = true);
+    
+    final bounds = _mapController.camera.visibleBounds;
+    // Vai buscar postos REAIS à área que está a ver no ecrã!
+    final postosEncontrados = await OverpassService.buscarPostosNaArea(
+      bounds.south, bounds.west, bounds.north, bounds.east
+    );
+
+    setState(() {
+      _postos = postosEncontrados;
+      _carregando = false;
+    });
   }
 
-  void _abrirDetalhes(Posto posto) {
-    showModalBottomSheet<void>(
+  void _mostrarDetalhes(Posto posto) {
+    showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.62,
-        minChildSize: 0.35,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => PostoDetalhesSheet(
-          postoId: posto.id,
-          scrollController: scrollController,
-          posicaoUsuario: _posicao,
-        ),
-      ),
-    );
-  }
-
-  void _novoRegistro() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const NovaAvaliacaoScreen()),
-    );
-  }
-
-  Marker _marcadorPosto(Posto p) {
-    return Marker(
-      point: LatLng(p.latitude, p.longitude),
-      width: 48,
-      height: 48,
-      alignment: Alignment.topCenter,
-      child: GestureDetector(
-        onTap: () => _abrirDetalhes(p),
-        child: Icon(
-          Icons.location_on,
-          size: 46,
-          color: p.status.cor,
-          shadows: const [Shadow(blurRadius: 4, color: Colors.black45)],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: const Color(0xFF2C2C2C),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.local_gas_station, color: Colors.amber, size: 40),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(posto.nome, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(posto.bandeira, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text('Endereço: ${posto.endereco}', style: const TextStyle(color: Colors.white70)),
+            Text('Bairro: ${posto.bairro}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+                onPressed: () {
+                  // Futura tela de gráficos (DAX/PowerQuery vibes)
+                },
+                child: const Text('Ver Histórico Químico', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
         ),
       ),
     );
@@ -125,128 +107,59 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Combustível SP'),
+        title: const Text('Radar de Postos', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        foregroundColor: Colors.white,
         actions: [
-          if (_buscandoGps)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
+          if (_carregando)
+            const Center(child: Padding(padding: EdgeInsets.only(right: 16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2)))),
+          IconButton(
+            icon: const Icon(Icons.travel_explore, color: Colors.amber),
+            onPressed: _buscarPostosNaRegiao, // Botão para pesquisar nesta área
+          ),
         ],
       ),
-      body: Stack(
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _centroMapa,
+          initialZoom: 15.0,
+        ),
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _centroSp,
-              initialZoom: 11.5,
-              minZoom: 5,
-              maxZoom: 18,
-              onMapReady: () {
-                _mapaPronto = true;
-                if (_posicao != null) _mapController.move(_posicao!, 14);
+          TileLayer(
+            // Mapa estilo Dark Mode da CartoDB (visual premium e gratuito)
+            urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            subdomains: const ['a', 'b', 'c', 'd'],
+          ),
+          MarkerClusterLayerWidget(
+            options: MarkerClusterLayerOptions(
+              maxClusterRadius: 45,
+              size: const Size(40, 40),
+              markers: _postos.map((posto) => Marker(
+                point: LatLng(posto.latitude, posto.longitude),
+                width: 40,
+                height: 40,
+                child: GestureDetector(
+                  onTap: () => _mostrarDetalhes(posto),
+                  child: const Icon(Icons.location_on, color: Colors.amber, size: 40),
+                ),
+              )).toList(),
+              builder: (context, markers) {
+                return Container(
+                  decoration: BoxDecoration(color: Colors.amber, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+                  child: Center(
+                    child: Text(markers.length.toString(), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  ),
+                );
               },
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'br.com.combustivel.combustivel_sp',
-              ),
-              ListenableBuilder(
-                listenable: _repo,
-                builder: (context, _) => MarkerLayer(
-                  markers: _repo.postos.map(_marcadorPosto).toList(),
-                ),
-              ),
-              if (_posicao != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _posicao!,
-                      width: 22,
-                      height: 22,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: const [
-                            BoxShadow(blurRadius: 6, color: Colors.black38),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              RichAttributionWidget(
-                alignment: AttributionAlignment.bottomLeft,
-                attributions: [
-                  TextSourceAttribution('© OpenStreetMap contributors'),
-                ],
-              ),
-            ],
-          ),
-          const Positioned(top: 12, left: 12, child: _Legenda()),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'gps',
-            tooltip: 'Minha localização',
-            onPressed: _localizarUsuario,
-            child: const Icon(Icons.my_location),
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'novo',
-            onPressed: _novoRegistro,
-            icon: const Icon(Icons.add),
-            label: const Text('Novo teste'),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Legenda extends StatelessWidget {
-  const _Legenda();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: StatusConformidade.values
-              .map(
-                (s) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.location_on, size: 16, color: s.cor),
-                      const SizedBox(width: 4),
-                      Text(s.rotulo, style: const TextStyle(fontSize: 11.5)),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.amber,
+        child: const Icon(Icons.my_location, color: Colors.black),
+        onPressed: _obterLocalizacaoAtual,
       ),
     );
   }
