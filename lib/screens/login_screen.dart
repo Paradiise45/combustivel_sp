@@ -11,8 +11,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _senhaController = TextEditingController();
 
   void _entrar() {
-    // No próximo passo ligaremos isto ao banco de dados do Supabase.
-    // Por agora, avança direto para o mapa premium.
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => MapScreen()),
@@ -91,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {}, // Tela de registo no futuro
+                onPressed: () {}, 
                 child: const Text('Criar nova conta de Avaliador', style: TextStyle(color: Colors.amber)),
               ),
             ],
