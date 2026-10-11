@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Por agora, avança direto para o mapa premium.
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => MapScreen()),
+      MaterialPageRoute(builder: (context) => Mapscreen()),
     );
   }
 
