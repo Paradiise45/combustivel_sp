@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'map_screen.dart';
+import 'map_screen.dart'; // Importação com o nome exato do arquivo que você tem
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -13,7 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _entrar() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => MapScreen()),
+      MaterialPageRoute(builder: (context) => MapaScreen()), // Chamada com a classe exata (com "a")
     );
   }
 
