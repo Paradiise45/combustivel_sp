@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'mapa_Screen.dart';
+import 'mapa_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Por agora, avança direto para o mapa premium.
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => MapaScreen()),
+      MaterialPageRoute(builder: (context) => Mapascreen()),
     );
   }
 
