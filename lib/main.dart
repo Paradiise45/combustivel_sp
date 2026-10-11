@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'screens/map_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
   runApp(const CombustivelApp());
 }
 
@@ -15,10 +14,14 @@ class CombustivelApp extends StatelessWidget {
       title: 'Combustível SP',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B7F4B)),
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.amber,
+          secondary: Colors.amberAccent,
+        ),
       ),
-      home: const MapScreen(),
+      home: LoginScreen(), // Agora o app arranca no Login
     );
   }
 }
