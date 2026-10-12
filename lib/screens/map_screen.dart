@@ -3,8 +3,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Para acessar os dados do usuário
 import '../models/posto_model.dart';
 import '../services/overpass_service.dart';
+import 'login_screen.dart'; // Para podermos voltar ao login ao sair
 
 class MapaScreen extends StatefulWidget {
   @override
@@ -16,6 +18,9 @@ class _MapaScreenState extends State<MapaScreen> {
   LatLng _centroMapa = const LatLng(-23.5505, -46.6333); // Inicia em SP
   List<Posto> _postos = [];
   bool _carregando = false;
+
+  // Puxa do banco de dados qual é o usuário que está logado agora
+  final _usuarioAtual = Supabase.instance.client.auth.currentUser;
 
   @override
   void initState() {
@@ -45,7 +50,6 @@ class _MapaScreenState extends State<MapaScreen> {
     setState(() => _carregando = true);
     
     final bounds = _mapController.camera.visibleBounds;
-    // Vai buscar postos REAIS à área que está a ver no ecrã!
     final postosEncontrados = await OverpassService.buscarPostosNaArea(
       bounds.south, bounds.west, bounds.north, bounds.east
     );
@@ -92,14 +96,24 @@ class _MapaScreenState extends State<MapaScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                 onPressed: () {
-                  // Futura tela de gráficos (DAX/PowerQuery vibes)
+                  // Aqui no futuro vamos chamar a tela de lançar novo teste
                 },
-                child: const Text('Ver Histórico Químico', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text('Registrar / Ver Histórico', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
               ),
             )
           ],
         ),
       ),
+    );
+  }
+
+  // Função para deslogar do Supabase e trancar o app
+  Future<void> _sair() async {
+    await Supabase.instance.client.auth.signOut();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),
     );
   }
 
@@ -115,52 +129,58 @@ class _MapaScreenState extends State<MapaScreen> {
             const Center(child: Padding(padding: EdgeInsets.only(right: 16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2)))),
           IconButton(
             icon: const Icon(Icons.travel_explore, color: Colors.amber),
-            onPressed: _buscarPostosNaRegiao, // Botão para pesquisar nesta área
+            onPressed: _buscarPostosNaRegiao,
           ),
         ],
       ),
+      
+      // === NOVO MENU LATERAL PROFISSIONAL ===
+      drawer: Drawer(
+        backgroundColor: const Color(0xFF1E1E1E),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFF2C2C2C)),
+              accountName: const Text('Avaliador Nível 1', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+              // Mostra o email real que você cadastrou no Supabase:
+              accountEmail: Text(
+                _usuarioAtual?.email ?? 'Usuário não identificado', 
+                style: const TextStyle(color: Colors.white70)
+              ),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.amber,
+                child: Icon(Icons.person, size: 40, color: Colors.black),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Colors.white),
+              title: const Text('Meu Perfil', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.history, color: Colors.white),
+              title: const Text('Meus Testes', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart, color: Colors.white),
+              title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context),
+            ),
+            const Divider(color: Colors.grey),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
+              title: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
+              onTap: _sair, // Executa o logout e volta para a tela de login
+            ),
+          ],
+        ),
+      ),
+      // =====================================
+
       body: FlutterMap(
         mapController: _mapController,
         options: MapOptions(
           initialCenter: _centroMapa,
-          initialZoom: 15.0,
-        ),
-        children: [
-          TileLayer(
-            // Mapa estilo Dark Mode da CartoDB (visual premium e gratuito)
-            urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-            subdomains: const ['a', 'b', 'c', 'd'],
-          ),
-          MarkerClusterLayerWidget(
-            options: MarkerClusterLayerOptions(
-              maxClusterRadius: 45,
-              size: const Size(40, 40),
-              markers: _postos.map((posto) => Marker(
-                point: LatLng(posto.latitude, posto.longitude),
-                width: 40,
-                height: 40,
-                child: GestureDetector(
-                  onTap: () => _mostrarDetalhes(posto),
-                  child: const Icon(Icons.location_on, color: Colors.amber, size: 40),
-                ),
-              )).toList(),
-              builder: (context, markers) {
-                return Container(
-                  decoration: BoxDecoration(color: Colors.amber, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
-                  child: Center(
-                    child: Text(markers.length.toString(), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber,
-        child: const Icon(Icons.my_location, color: Colors.black),
-        onPressed: _obterLocalizacaoAtual,
-      ),
-    );
-  }
-}
+          initialZoom
