@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'map_screen.dart'; // Importação com o nome exato do arquivo que você tem
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'map_screen.dart';
+import 'cadastro_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -9,12 +11,33 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _senhaController = TextEditingController();
+  bool _carregando = false;
 
-  void _entrar() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => MapaScreen()), // Chamada com a classe exata (com "a")
-    );
+  Future<void> _entrar() async {
+    setState(() => _carregando = true);
+    try {
+      // Validação real no banco de dados!
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _senhaController.text.trim(),
+      );
+      
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => MapaScreen()),
+      );
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: Credenciais inválidas.'), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro inesperado.'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
   }
 
   @override
@@ -29,28 +52,18 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Icon(Icons.local_gas_station, size: 100, color: Colors.amber),
               const SizedBox(height: 20),
-              const Text(
-                'Combustível SP',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
+              const Text('Combustível SP', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 8),
-              const Text(
-                'Monitorização em Tempo Real',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
+              const Text('Monitorização em Tempo Real', style: TextStyle(fontSize: 16, color: Colors.grey)),
               const SizedBox(height: 50),
               TextField(
                 controller: _emailController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'E-mail',
-                  labelStyle: const TextStyle(color: Colors.grey),
                   filled: true,
                   fillColor: const Color(0xFF2C2C2C),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.email, color: Colors.grey),
                 ),
               ),
@@ -61,35 +74,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Senha',
-                  labelStyle: const TextStyle(color: Colors.grey),
                   filled: true,
                   fillColor: const Color(0xFF2C2C2C),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.lock, color: Colors.grey),
                 ),
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: _entrar,
-                  child: const Text(
-                    'Entrar',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                ),
-              ),
+              _carregando
+                  ? const CircularProgressIndicator(color: Colors.amber)
+                  : SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _entrar,
+                        child: const Text('Entrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                      ),
+                    ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {}, 
+                onPressed: () {
+                  // Agora o botão chama a tela real de registo!
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => CadastroScreen()));
+                },
                 child: const Text('Criar nova conta de Avaliador', style: TextStyle(color: Colors.amber)),
               ),
             ],
