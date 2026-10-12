@@ -3,10 +3,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Para acessar os dados do usuário
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/posto_model.dart';
 import '../services/overpass_service.dart';
-import 'login_screen.dart'; // Para podermos voltar ao login ao sair
+import 'login_screen.dart';
+import 'nova_avaliacao_screen.dart'; // <-- A tela de registro está ligada aqui!
 
 class MapaScreen extends StatefulWidget {
   @override
@@ -15,11 +16,10 @@ class MapaScreen extends StatefulWidget {
 
 class _MapaScreenState extends State<MapaScreen> {
   final MapController _mapController = MapController();
-  LatLng _centroMapa = const LatLng(-23.5505, -46.6333); // Inicia em SP
+  LatLng _centroMapa = const LatLng(-23.5505, -46.6333); 
   List<Posto> _postos = [];
   bool _carregando = false;
 
-  // Puxa do banco de dados qual é o usuário que está logado agora
   final _usuarioAtual = Supabase.instance.client.auth.currentUser;
 
   @override
@@ -96,9 +96,15 @@ class _MapaScreenState extends State<MapaScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                 onPressed: () {
-                  // Aqui no futuro vamos chamar a tela de lançar novo teste
+                  // Fecha o painel inferior do mapa
+                  Navigator.pop(context);
+                  // Abre a tela de avaliação passando os dados do posto
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => NovaAvaliacaoScreen(posto: posto)),
+                  );
                 },
-                child: const Text('Registrar / Ver Histórico', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text('Registrar Avaliação', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -107,7 +113,6 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  // Função para deslogar do Supabase e trancar o app
   Future<void> _sair() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
@@ -133,8 +138,6 @@ class _MapaScreenState extends State<MapaScreen> {
           ),
         ],
       ),
-      
-      // === NOVO MENU LATERAL PROFISSIONAL ===
       drawer: Drawer(
         backgroundColor: const Color(0xFF1E1E1E),
         child: ListView(
@@ -143,7 +146,6 @@ class _MapaScreenState extends State<MapaScreen> {
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(color: Color(0xFF2C2C2C)),
               accountName: const Text('Avaliador Nível 1', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-              // Mostra o email real que você cadastrou no Supabase:
               accountEmail: Text(
                 _usuarioAtual?.email ?? 'Usuário não identificado', 
                 style: const TextStyle(color: Colors.white70)
@@ -172,15 +174,60 @@ class _MapaScreenState extends State<MapaScreen> {
             ListTile(
               leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
               title: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
-              onTap: _sair, // Executa o logout e volta para a tela de login
+              onTap: _sair, 
             ),
           ],
         ),
       ),
-      // =====================================
-
       body: FlutterMap(
         mapController: _mapController,
         options: MapOptions(
           initialCenter: _centroMapa,
-          initialZoom
+          initialZoom: 15.0,
+        ),
+        children: [
+          ColorFiltered(
+            colorFilter: const ColorFilter.matrix([
+              -1,  0,  0, 0, 255,
+               0, -1,  0, 0, 255,
+               0,  0, -1, 0, 255,
+               0,  0,  0, 1,   0,
+            ]),
+            child: TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'br.com.combustivel',
+            ),
+          ),
+          MarkerClusterLayerWidget(
+            options: MarkerClusterLayerOptions(
+              maxClusterRadius: 45,
+              size: const Size(40, 40),
+              markers: _postos.map((posto) => Marker(
+                point: LatLng(posto.latitude, posto.longitude),
+                width: 40,
+                height: 40,
+                child: GestureDetector(
+                  onTap: () => _mostrarDetalhes(posto),
+                  child: const Icon(Icons.location_on, color: Colors.amber, size: 40),
+                ),
+              )).toList(),
+              builder: (context, markers) {
+                return Container(
+                  decoration: BoxDecoration(color: Colors.amber, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+                  child: Center(
+                    child: Text(markers.length.toString(), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.amber,
+        child: const Icon(Icons.my_location, color: Colors.black),
+        onPressed: _obterLocalizacaoAtual,
+      ),
+    );
+  }
+}
