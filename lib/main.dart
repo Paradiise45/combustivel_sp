@@ -13,7 +13,7 @@ final _temaClaro = ThemeData(
     seedColor: const Color(0xFF2E5B3E), // Verde escuro elegante
     primary: const Color(0xFF2E5B3E),
     secondary: Colors.amber,
-    surface: const Color(0xFFF7F9F8), // Fundo quase branco, bege muito claro
+    surface: const Color(0xFFF7F9F8), // Fundo quase branco
     onSurface: const Color(0xFF1E1E1E), // Texto escuro
   ),
   appBarTheme: const AppBarTheme(
@@ -36,11 +36,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
-    url: 'https://jncvvwqqugnkqznmbajm.supabase.co', // <--- Não se esqueça de repor as suas chaves!
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuY3Z2d3FxdWdua3F6bm1iYWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTk5NTQsImV4cCI6MjEwNzMzNTk1NH0.66FfH91G1hS-iIT2J4bGrGtvZz53Oj64ihAA_vx7EUI',
+    url: 'COLE_AQUI_A_SUA_URL', // <--- COLOQUE A SUA URL AQUI
+    anonKey: 'COLE_AQUI_A_SUA_CHAVE_ANON', // <--- COLOQUE A SUA CHAVE AQUI
   );
 
-  // O ProviderScope ativa a gestão de estado do Riverpod
   runApp(const ProviderScope(child: CombustivelApp()));
 }
 
@@ -63,19 +62,11 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/login',
-      builder: (context, state) => Scaffold(
-        appBar: AppBar(title: const Text('Entrar')),
-        body: const Center(child: Text('Tela de Login provisória')),
-      ),
+      builder: (context, state) => LoginScreen(), // Liga à tela real
     ),
     GoRoute(
       path: '/',
-      builder: (context, state) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Combustível SP', style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        body: const Center(child: Text('Bem-vindo ao novo mapa (Tema Claro)')),
-      ),
+      builder: (context, state) => MapaScreen(), // Liga ao mapa real
     ),
   ],
 );
