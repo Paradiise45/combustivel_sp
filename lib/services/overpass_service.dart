@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
 import '../models/posto_model.dart';
 
 class OverpassService {
@@ -11,50 +10,40 @@ class OverpassService {
     double sul, double oeste, double norte, double leste
   ) async {
     // Query para procurar tudo o que seja amenity=fuel (postos de combustível)
+    // AGORA INCLUI 'node' (pontos) e 'way' (áreas/polígonos)
     final query = '''
       [out:json][timeout:25];
-      node["amenity"="fuel"]($sul,$oeste,$norte,$leste);
-      out body;
+      (
+        node["amenity"="fuel"]($sul,$oeste,$norte,$leste);
+        way["amenity"="fuel"]($sul,$oeste,$norte,$leste);
+      );
+      out center;
     ''';
 
     try {
       final response = await http.post(
         Uri.parse(_baseUrl),
-        body: {'data': query},
+        body: query,
+        headers: {
+          // FUNDAMENTAL: Evita que o Overpass bloqueie o seu aplicativo!
+          'User-Agent': 'CombustivelSP_App_Jonatas/1.0', 
+        }
       );
 
       if (response.statusCode == 200) {
+        // O utf8.decode garante que os acentos (ç, ã, é) aparecem corretamente
         final data = json.decode(utf8.decode(response.bodyBytes));
         final elements = data['elements'] as List;
 
-        return elements.map((e) {
-          final tags = e['tags'] ?? {};
-          final lat = e['lat'];
-          final lon = e['lon'];
-          
-          // Extrair nome e bandeira do posto (se existir no mapa real)
-          final nome = tags['name'] ?? tags['brand'] ?? 'Posto de Combustível';
-          final bandeira = tags['brand'] ?? 'Bandeira Branca / Desconhecida';
-          final rua = tags['addr:street'] ?? 'Endereço não especificado';
-          final numero = tags['addr:housenumber'] ?? '';
-
-          return Posto(
-            id: e['id'].toString(),
-            nome: nome,
-            bandeira: bandeira,
-            endereco: '$rua $numero'.trim(),
-            bairro: tags['addr:suburb'] ?? tags['addr:city'] ?? 'São Paulo',
-            latitude: lat,
-            longitude: lon,
-            testes: [], // Inicia vazio (virá do Supabase depois)
-            avaliacoes: [],
-          );
-        }).toList();
+        // Usa a Factory inteligente que colocámos no posto_model.dart
+        return elements.map((e) => Posto.fromOverpass(e)).toList();
+      } else {
+        print('Erro no Overpass: Código ${response.statusCode}');
+        return [];
       }
     } catch (e) {
-      print('Erro ao buscar postos reais: $e');
+      print('Erro de conexão Overpass: $e');
+      return [];
     }
-    
-    return [];
   }
 }
