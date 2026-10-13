@@ -17,6 +17,8 @@ class Avaliacao {
 }
 
 class Posto {
+  /// Para postos vindos do Overpass: "node/123" ou "way/123"
+  /// (o id numérico do OSM só é único dentro de cada tipo).
   final String id;
   final String nome;
   final String bandeira;
@@ -40,16 +42,19 @@ class Posto {
   })  : testes = testes ?? [],
         avaliacoes = avaliacoes ?? [];
 
-  // --- O CÓDIGO NOVO PARA O OVERPASS ENTRA AQUI ---
+  /// Cria um posto a partir de um elemento do Overpass (`out center;`).
+  /// 'node' tem lat/lon na raiz; 'way' tem as coordenadas dentro de 'center'.
   factory Posto.fromOverpass(Map<String, dynamic> json) {
-    final tags = json['tags'] ?? {};
-    
-    // TRUQUE: 'nodes' têm lat/lon na raiz. 'ways' têm as coordenadas dentro de 'center'
-    final double lat = json['lat'] ?? json['center']?['lat'] ?? 0.0;
-    final double lon = json['lon'] ?? json['center']?['lon'] ?? 0.0;
+    final tags = (json['tags'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final centro = json['center'] as Map?;
+
+    final double lat = ((json['lat'] ?? centro?['lat'] ?? 0.0) as num).toDouble();
+    final double lon = ((json['lon'] ?? centro?['lon'] ?? 0.0) as num).toDouble();
+    final tipo = json['type'] ?? 'node';
 
     return Posto(
-      id: json['id'].toString(),
+      id: '$tipo/${json['id']}',
       nome: tags['name'] ?? 'Posto Sem Nome',
       bandeira: tags['brand'] ?? 'Bandeira Branca',
       endereco: tags['addr:street'] ?? 'Endereço não informado',
@@ -58,7 +63,6 @@ class Posto {
       longitude: lon,
     );
   }
-  // ------------------------------------------------
 
   /// Testes do mais recente para o mais antigo.
   List<TesteCombustivel> get testesOrdenados =>
