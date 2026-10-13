@@ -22,7 +22,7 @@ extension FonteTesteRotulo on FonteTeste {
 
 class ReferenciaConformidade {
   ReferenciaConformidade._();
-  static const double etanolNaGasolina = 30.0;
+  static const double etanolNaGasolina = 32.0;
   static const double toleranciaEtanol = 1.0;
   static const double toleranciaAlerta = 3.0;
   static const double densGasolinaMin = 0.715;
