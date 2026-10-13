@@ -37,8 +37,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
-    url: 'COLE_AQUI_A_SUA_URL', // <--- COLOQUE A SUA URL AQUI
-    anonKey: 'COLE_AQUI_A_SUA_CHAVE_ANON', // <--- COLOQUE A SUA CHAVE AQUI
+    url: 'https://jncvvwqqugnkqznmbajm.supabase.co
+', // <--- COLOQUE A SUA URL AQUI
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuY3Z2d3FxdWdua3F6bm1iYWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTk5NTQsImV4cCI6MjEwNzMzNTk1NH0.66FfH91G1hS-iIT2J4bGrGtvZz53Oj64ihAA_vx7EUI', // <--- COLOQUE A SUA CHAVE AQUI
   );
 
   runApp(const ProviderScope(child: CombustivelApp()));
