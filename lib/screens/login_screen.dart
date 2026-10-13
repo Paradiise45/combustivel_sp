@@ -93,11 +93,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
               const SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  // A tela de cadastro ainda não migrámos para o GoRouter, mas faremos depois
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cadastro em atualização...')));
-                },
+             TextButton(
+                onPressed: () => context.push('/cadastro'),
                 child: Text('Criar nova conta de Avaliador', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
               ),
             ],
