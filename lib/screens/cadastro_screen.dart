@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 class CadastroScreen extends StatefulWidget {
   @override
@@ -11,20 +12,17 @@ class _CadastroScreenState extends State<CadastroScreen> {
   final _senhaController = TextEditingController();
   bool _carregando = false;
 
-  Future<void> _criarConta() async {
+  Future<void> _cadastrar() async {
     setState(() => _carregando = true);
     try {
-      // Comando real que envia os dados para o Supabase
+      // Cria a conta no Supabase (como desativámos o envio de email, o login é automático)
       await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _senhaController.text.trim(),
       );
       
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Conta criada com sucesso! Pode fazer login.'), backgroundColor: Colors.green),
-      );
-      Navigator.pop(context); // Volta à tela de login
+      context.go('/'); // Vai direto para o mapa após criar a conta
       
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,54 +40,56 @@ class _CadastroScreenState extends State<CadastroScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Criar Conta de Avaliador'),
-        backgroundColor: const Color(0xFF1E1E1E),
-      ),
-      backgroundColor: const Color(0xFF1E1E1E),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'E-mail',
-                filled: true,
-                fillColor: const Color(0xFF2C2C2C),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      appBar: AppBar(title: const Text('Criar Conta')),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_add, size: 80, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 20),
+              Text(
+                'Novo Avaliador',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _senhaController,
-              obscureText: true,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Senha (mín. 6 caracteres)',
-                filled: true,
-                fillColor: const Color(0xFF2C2C2C),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              const SizedBox(height: 40),
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'E-mail',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.email, color: Colors.grey),
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            _carregando
-                ? const CircularProgressIndicator(color: Colors.amber)
-                : SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _senhaController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Senha (mínimo 6 caracteres)',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                ),
+              ),
+              const SizedBox(height: 32),
+              _carregando
+                  ? const CircularProgressIndicator()
+                  : SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        onPressed: _cadastrar,
+                        child: const Text('Cadastrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
-                      onPressed: _criarConta,
-                      child: const Text('Registrar', style: TextStyle(fontSize: 18, color: Colors.black, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-          ],
+            ],
+          ),
         ),
       ),
     );
