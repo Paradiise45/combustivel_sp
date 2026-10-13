@@ -37,8 +37,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
-    url: 'https://jncvvwqqugnkqznmbajm.supabase.co
-', // <--- COLOQUE A SUA URL AQUI
+    url: 'https://jncvvwqqugnkqznmbajm.supabase.co', // <--- COLOQUE A SUA URL AQUI
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuY3Z2d3FxdWdua3F6bm1iYWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTk5NTQsImV4cCI6MjEwNzMzNTk1NH0.66FfH91G1hS-iIT2J4bGrGtvZz53Oj64ihAA_vx7EUI', // <--- COLOQUE A SUA CHAVE AQUI
   );
 
