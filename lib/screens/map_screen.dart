@@ -4,10 +4,9 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../models/posto_model.dart';
 import '../services/overpass_service.dart';
-import 'login_screen.dart';
-import 'nova_avaliacao_screen.dart'; // <-- A tela de registro está ligada aqui!
 
 class MapaScreen extends StatefulWidget {
   @override
@@ -39,6 +38,7 @@ class _MapaScreenState extends State<MapaScreen> {
     }
 
     Position position = await Geolocator.getCurrentPosition();
+    if (!mounted) return;
     setState(() {
       _centroMapa = LatLng(position.latitude, position.longitude);
     });
@@ -54,6 +54,7 @@ class _MapaScreenState extends State<MapaScreen> {
       bounds.south, bounds.west, bounds.north, bounds.east
     );
 
+    if (!mounted) return;
     setState(() {
       _postos = postosEncontrados;
       _carregando = false;
@@ -64,7 +65,7 @@ class _MapaScreenState extends State<MapaScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      backgroundColor: const Color(0xFF2C2C2C),
+      backgroundColor: Colors.white,
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -73,38 +74,33 @@ class _MapaScreenState extends State<MapaScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.local_gas_station, color: Colors.amber, size: 40),
+                Icon(Icons.local_gas_station, color: Theme.of(context).colorScheme.primary, size: 40),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(posto.nome, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text(posto.bandeira, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                      Text(posto.nome, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      Text(posto.bandeira, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            Text('Endereço: ${posto.endereco}', style: const TextStyle(color: Colors.white70)),
-            Text('Bairro: ${posto.bairro}', style: const TextStyle(color: Colors.white70)),
+            Text('Endereço: ${posto.endereco}', style: const TextStyle(color: Colors.black87)),
+            Text('Bairro: ${posto.bairro}', style: const TextStyle(color: Colors.black87)),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                 onPressed: () {
-                  // Fecha o painel inferior do mapa
                   Navigator.pop(context);
-                  // Abre a tela de avaliação passando os dados do posto
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => NovaAvaliacaoScreen(posto: posto)),
-                  );
+                  // Rota para o futuro formulário de teste
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulário em construção...')));
                 },
-                child: const Text('Registrar Avaliação', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text('Registrar Avaliação', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -116,10 +112,7 @@ class _MapaScreenState extends State<MapaScreen> {
   Future<void> _sair() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
-    );
+    context.go('/login'); // Usando GoRouter
   }
 
   @override
@@ -127,50 +120,35 @@ class _MapaScreenState extends State<MapaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Radar de Postos', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
         actions: [
           if (_carregando)
-            const Center(child: Padding(padding: EdgeInsets.only(right: 16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2)))),
+            const Center(child: Padding(padding: EdgeInsets.only(right: 16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
           IconButton(
-            icon: const Icon(Icons.travel_explore, color: Colors.amber),
+            icon: Icon(Icons.travel_explore, color: Theme.of(context).colorScheme.primary),
             onPressed: _buscarPostosNaRegiao,
           ),
         ],
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: Colors.white,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF2C2C2C)),
-              accountName: const Text('Avaliador Nível 1', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-              accountEmail: Text(
-                _usuarioAtual?.email ?? 'Usuário não identificado', 
-                style: const TextStyle(color: Colors.white70)
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+              accountName: const Text('Conta de Avaliador', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              accountEmail: Text(_usuarioAtual?.email ?? '', style: const TextStyle(color: Colors.white70)),
               currentAccountPicture: const CircleAvatar(
-                backgroundColor: Colors.amber,
-                child: Icon(Icons.person, size: 40, color: Colors.black),
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, size: 40, color: Color(0xFF2E5B3E)),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.person, color: Colors.white),
-              title: const Text('Meu Perfil', style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.history, color: Colors.grey.shade800),
+              title: Text('Meus Testes', style: TextStyle(color: Colors.grey.shade800)),
               onTap: () => Navigator.pop(context),
             ),
-            ListTile(
-              leading: const Icon(Icons.history, color: Colors.white),
-              title: const Text('Meus Testes', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.bar_chart, color: Colors.white),
-              title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(context),
-            ),
-            const Divider(color: Colors.grey),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
               title: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
@@ -186,17 +164,10 @@ class _MapaScreenState extends State<MapaScreen> {
           initialZoom: 15.0,
         ),
         children: [
-          ColorFiltered(
-            colorFilter: const ColorFilter.matrix([
-              -1,  0,  0, 0, 255,
-               0, -1,  0, 0, 255,
-               0,  0, -1, 0, 255,
-               0,  0,  0, 1,   0,
-            ]),
-            child: TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'br.com.combustivel',
-            ),
+          // Mapa limpo original!
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'br.com.combustivel',
           ),
           MarkerClusterLayerWidget(
             options: MarkerClusterLayerOptions(
@@ -208,14 +179,18 @@ class _MapaScreenState extends State<MapaScreen> {
                 height: 40,
                 child: GestureDetector(
                   onTap: () => _mostrarDetalhes(posto),
-                  child: const Icon(Icons.location_on, color: Colors.amber, size: 40),
+                  child: Icon(Icons.location_on, color: Theme.of(context).colorScheme.primary, size: 40),
                 ),
               )).toList(),
               builder: (context, markers) {
                 return Container(
-                  decoration: BoxDecoration(color: Colors.amber, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary, 
+                    shape: BoxShape.circle, 
+                    border: Border.all(color: Colors.white, width: 2)
+                  ),
                   child: Center(
-                    child: Text(markers.length.toString(), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    child: Text(markers.length.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 );
               },
@@ -224,8 +199,8 @@ class _MapaScreenState extends State<MapaScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber,
-        child: const Icon(Icons.my_location, color: Colors.black),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        child: const Icon(Icons.my_location, color: Colors.white),
         onPressed: _obterLocalizacaoAtual,
       ),
     );
