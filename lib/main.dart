@@ -1,86 +1,94 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'screens/login_screen.dart';
-import 'screens/map_screen.dart'; // Importa a tela do mapa
+import 'package:go_router/go_router.dart';
 
+// O nosso tema visual profissional inspirado no seu mockup
+final _temaClaro = ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.light,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: const Color(0xFF2E5B3E), // Verde escuro elegante
+    primary: const Color(0xFF2E5B3E),
+    secondary: Colors.amber,
+    surface: const Color(0xFFF7F9F8), // Fundo quase branco, bege muito claro
+    onSurface: const Color(0xFF1E1E1E), // Texto escuro
+  ),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Colors.white,
+    foregroundColor: Color(0xFF1E1E1E),
+    elevation: 0,
+    centerTitle: true,
+  ),
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF2E5B3E),
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  ),
+);
+
+// PONTO DE ENTRADA DO APLICATIVO
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
-    url: 'https://jncvvwqqugnkqznmbajm.supabase.co', // <--- COLOQUE A SUA URL AQUI
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuY3Z2d3FxdWdua3F6bm1iYWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTk5NTQsImV4cCI6MjEwNzMzNTk1NH0.66FfH91G1hS-iIT2J4bGrGtvZz53Oj64ihAA_vx7EUI', // <--- COLOQUE A SUA CHAVE AQUI
+    url: 'https://jncvvwqqugnkqznmbajm.supabase.co', // <--- Não se esqueça de repor as suas chaves!
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuY3Z2d3FxdWdua3F6bm1iYWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTk5NTQsImV4cCI6MjEwNzMzNTk1NH0.66FfH91G1hS-iIT2J4bGrGtvZz53Oj64ihAA_vx7EUI',
   );
 
-  runApp(const CombustivelApp());
+  // O ProviderScope ativa a gestão de estado do Riverpod
+  runApp(const ProviderScope(child: CombustivelApp()));
 }
+
+// O ROUTER (Gestor de Navegação)
+final _router = GoRouter(
+  initialLocation: '/',
+  // Redirecionamento de segurança: se não estiver logado, obriga a ir para o Login
+  redirect: (context, state) {
+    final sessao = Supabase.instance.client.auth.currentSession;
+    final isLoginRoute = state.uri.path == '/login' || state.uri.path == '/cadastro';
+    
+    if (sessao == null && !isLoginRoute) {
+      return '/login';
+    }
+    if (sessao != null && isLoginRoute) {
+      return '/'; // Vai para o mapa
+    }
+    return null; // Deixa o utilizador prosseguir
+  },
+  routes: [
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => Scaffold(
+        appBar: AppBar(title: const Text('Entrar')),
+        body: const Center(child: Text('Tela de Login provisória')),
+      ),
+    ),
+    GoRoute(
+      path: '/',
+      builder: (context, state) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Combustível SP', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        body: const Center(child: Text('Bem-vindo ao novo mapa (Tema Claro)')),
+      ),
+    ),
+  ],
+);
 
 class CombustivelApp extends StatelessWidget {
   const CombustivelApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Combustível SP',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF1E1E1E),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.amber,
-          secondary: Colors.amberAccent,
-        ),
-      ),
-      // O app agora arranca na tela de verificação
-      home: SplashSessaoScreen(),
-    );
-  }
-}
-
-// === TELA DE VERIFICAÇÃO DE SESSÃO ===
-class SplashSessaoScreen extends StatefulWidget {
-  @override
-  _SplashSessaoScreenState createState() => _SplashSessaoScreenState();
-}
-
-class _SplashSessaoScreenState extends State<SplashSessaoScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _verificarSessao();
-  }
-
-  Future<void> _verificarSessao() async {
-    // Dá um tempinho minúsculo para a tela renderizar e a verificação acontecer
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Pergunta ao Supabase se há uma sessão ativa
-    final sessao = Supabase.instance.client.auth.currentSession;
-    
-    if (!mounted) return;
-
-    if (sessao != null) {
-      // Se houver sessão, vai direto pro mapa (sem opção de voltar pro login pelo botão voltar do celular)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => MapaScreen()),
-      );
-    } else {
-      // Se não houver, vai para a tela de login
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF1E1E1E),
-      body: Center(
-        // Enquanto pensa, mostra um carregamento com a cor do app
-        child: CircularProgressIndicator(color: Colors.amber),
-      ),
+      theme: _temaClaro,       // Forçamos o nosso novo tema
+      themeMode: ThemeMode.light, // Acabou o Dark Mode!
+      routerConfig: _router,
     );
   }
 }
