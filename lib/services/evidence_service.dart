@@ -1,55 +1,92 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class EvidenceService {
-  static final _picker = ImagePicker();
-  static final _supabase = Supabase.instance.client;
+/// Tipos de evidência. O nome do arquivo precisa bater com o que o trigger
+/// `fuel_tests_before_insert` procura no Storage (proveta.jpg e fachada.jpg).
+enum TipoEvidencia {
+  proveta('proveta.jpg'),
+  fachada('fachada.jpg'),
+  cupom('cupom.jpg');
 
-  // 1. Abre a câmara e tira a foto (Bloqueia o uso da galeria para evitar fraudes)
+  const TipoEvidencia(this.arquivo);
+  final String arquivo;
+}
+
+class EvidenciaException implements Exception {
+  const EvidenciaException(this.mensagem);
+  final String mensagem;
+
+  @override
+  String toString() => mensagem;
+}
+
+class EvidenceService {
+  EvidenceService._();
+
+  static const String _bucket = 'test-evidence';
+  static final ImagePicker _picker = ImagePicker();
+  static SupabaseClient get _supabase => Supabase.instance.client;
+
+  /// Caminho no bucket: <user_id>/<test_id>/<tipo>.jpg
+  static String caminhoDaEvidencia(
+    String userId,
+    String testId,
+    TipoEvidencia tipo,
+  ) =>
+      '$userId/$testId/${tipo.arquivo}';
+
+  /// Abre a câmera (a galeria fica bloqueada de propósito, contra fraude).
+  /// Retorna null se o usuário cancelar ou se a câmera falhar.
   static Future<File?> tirarFotoDaCamera() async {
     try {
       final XFile? foto = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 70, // Comprime a 70% para o upload ser super rápido
-        maxWidth: 1024,   // Evita imagens gigantescas de 40 Megapixels
+        imageQuality: 80, // JPEG
+        maxWidth: 1600, // legível o bastante para conferir a escala da proveta
       );
-      
-      if (foto != null) {
-        return File(foto.path);
-      }
+      return foto == null ? null : File(foto.path);
     } catch (e) {
-      print('Erro ao abrir câmara: $e');
+      debugPrint('Erro ao abrir a câmera: $e');
+      return null;
     }
-    return null;
   }
 
-  // 2. Envia a foto recém-tirada para o cofre (Bucket) no Supabase
-  static Future<String?> fazerUpload(File arquivo, String testId, String tipoDaFoto) async {
-    try {
-      final usuario = _supabase.auth.currentUser;
-      if (usuario == null) throw Exception('Utilizador não autenticado.');
-
-      // Monta o caminho exato dentro do cofre. 
-      // Exemplo: 123-uuid / 456-uuid / proveta.jpg
-      final caminhoNoCofre = '${usuario.id}/$testId/$tipoDaFoto.jpg';
-
-      // Faz o upload real para o Supabase
-      await _supabase.storage.from('test-evidence').upload(
-        caminhoNoCofre,
-        arquivo,
-        fileOptions: const FileOptions(
-          cacheControl: '3600', 
-          upsert: true // Se já existir uma foto com esse nome, substitui (útil se o utilizador quiser refazer a foto)
-        ),
+  /// Envia a foto para o bucket privado e devolve o caminho.
+  /// LANÇA [EvidenciaException] em caso de falha (nada de erro silencioso).
+  /// Não usa upsert: uma evidência enviada não pode ser substituída depois.
+  static Future<String> fazerUpload(
+    File arquivo,
+    String testId,
+    TipoEvidencia tipo,
+  ) async {
+    final usuario = _supabase.auth.currentUser;
+    if (usuario == null) {
+      throw const EvidenciaException(
+        'Sessão expirada. Faça login novamente.',
       );
+    }
 
-      // Retorna o caminho para podermos guardar na base de dados depois
-      return caminhoNoCofre;
-      
+    final caminho = caminhoDaEvidencia(usuario.id, testId, tipo);
+
+    try {
+      await _supabase.storage.from(_bucket).upload(
+            caminho,
+            arquivo,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              cacheControl: '3600',
+              upsert: false,
+            ),
+          );
+      return caminho;
+    } on StorageException catch (e) {
+      throw EvidenciaException(
+        'Falha ao enviar a foto (${tipo.name}): ${e.message}',
+      );
     } catch (e) {
-      print('Erro ao fazer upload da evidência: $e');
-      return null;
+      throw EvidenciaException('Falha ao enviar a foto (${tipo.name}): $e');
     }
   }
 }
