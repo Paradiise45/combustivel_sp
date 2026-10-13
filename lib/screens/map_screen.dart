@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../models/posto_model.dart';
 import '../services/overpass_service.dart';
+import 'test_form_screen.dart'; // <-- Importamos o formulário aqui!
 
 class MapaScreen extends StatefulWidget {
   @override
@@ -96,11 +97,14 @@ class _MapaScreenState extends State<MapaScreen> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  // Rota para o futuro formulário de teste
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulário em construção...')));
+                  Navigator.pop(context); // Fecha o painel inferior
+                  // Abre a tela de avaliação com a calculadora ao vivo!
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => TestFormScreen(posto: posto)),
+                  );
                 },
-                child: const Text('Registrar Avaliação', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Registrar Teste Físico', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -112,7 +116,7 @@ class _MapaScreenState extends State<MapaScreen> {
   Future<void> _sair() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
-    context.go('/login'); // Usando GoRouter
+    context.go('/login');
   }
 
   @override
@@ -164,7 +168,6 @@ class _MapaScreenState extends State<MapaScreen> {
           initialZoom: 15.0,
         ),
         children: [
-          // Mapa limpo original!
           TileLayer(
             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             userAgentPackageName: 'br.com.combustivel',
