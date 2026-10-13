@@ -40,6 +40,26 @@ class Posto {
   })  : testes = testes ?? [],
         avaliacoes = avaliacoes ?? [];
 
+  // --- O CÓDIGO NOVO PARA O OVERPASS ENTRA AQUI ---
+  factory Posto.fromOverpass(Map<String, dynamic> json) {
+    final tags = json['tags'] ?? {};
+    
+    // TRUQUE: 'nodes' têm lat/lon na raiz. 'ways' têm as coordenadas dentro de 'center'
+    final double lat = json['lat'] ?? json['center']?['lat'] ?? 0.0;
+    final double lon = json['lon'] ?? json['center']?['lon'] ?? 0.0;
+
+    return Posto(
+      id: json['id'].toString(),
+      nome: tags['name'] ?? 'Posto Sem Nome',
+      bandeira: tags['brand'] ?? 'Bandeira Branca',
+      endereco: tags['addr:street'] ?? 'Endereço não informado',
+      bairro: tags['addr:suburb'] ?? '',
+      latitude: lat,
+      longitude: lon,
+    );
+  }
+  // ------------------------------------------------
+
   /// Testes do mais recente para o mais antigo.
   List<TesteCombustivel> get testesOrdenados =>
       [...testes]..sort((a, b) => b.data.compareTo(a.data));
