@@ -63,11 +63,15 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/login',
-      builder: (context, state) => LoginScreen(), // Liga à tela real
+      builder: (context, state) => LoginScreen(), 
+    ),
+    GoRoute(
+      path: '/cadastro',
+      builder: (context, state) => CadastroScreen(), 
     ),
     GoRoute(
       path: '/',
-      builder: (context, state) => MapaScreen(), // Liga ao mapa real
+      builder: (context, state) => MapaScreen(), 
     ),
   ],
 );
@@ -80,8 +84,8 @@ class CombustivelApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Combustível SP',
       debugShowCheckedModeBanner: false,
-      theme: _temaClaro,       // Forçamos o nosso novo tema
-      themeMode: ThemeMode.light, // Acabou o Dark Mode!
+      theme: _temaClaro,       
+      themeMode: ThemeMode.light, 
       routerConfig: _router,
     );
   }
