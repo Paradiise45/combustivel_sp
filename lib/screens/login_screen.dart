@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'map_screen.dart';
-import 'cadastro_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -16,20 +15,18 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _entrar() async {
     setState(() => _carregando = true);
     try {
-      // Validação real no banco de dados!
       await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _senhaController.text.trim(),
       );
       
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => MapaScreen()),
-      );
+      // GoRouter usa "go" em vez do antigo Navigator
+      context.go('/');
+      
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: Credenciais inválidas.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Erro: Credenciais inválidas.'), backgroundColor: Colors.red),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,27 +40,31 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E1E),
+      // Fundo claro do nosso novo tema
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.local_gas_station, size: 100, color: Colors.amber),
+              Icon(Icons.local_gas_station, size: 100, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 20),
-              const Text('Combustível SP', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(
+                'Combustível SP',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+              ),
               const SizedBox(height: 8),
-              const Text('Monitorização em Tempo Real', style: TextStyle(fontSize: 16, color: Colors.grey)),
+              Text('Auditoria e Monitorização', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
               const SizedBox(height: 50),
               TextField(
                 controller: _emailController,
-                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'E-mail',
                   filled: true,
-                  fillColor: const Color(0xFF2C2C2C),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
                   prefixIcon: const Icon(Icons.email, color: Colors.grey),
                 ),
               ),
@@ -71,37 +72,33 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _senhaController,
                 obscureText: true,
-                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Senha',
                   filled: true,
-                  fillColor: const Color(0xFF2C2C2C),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
                   prefixIcon: const Icon(Icons.lock, color: Colors.grey),
                 ),
               ),
               const SizedBox(height: 32),
               _carregando
-                  ? const CircularProgressIndicator(color: Colors.amber)
+                  ? const CircularProgressIndicator()
                   : SizedBox(
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
                         onPressed: _entrar,
-                        child: const Text('Entrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                        child: const Text('Entrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                     ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
-                  // Agora o botão chama a tela real de registo!
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => CadastroScreen()));
+                  // A tela de cadastro ainda não migrámos para o GoRouter, mas faremos depois
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cadastro em atualização...')));
                 },
-                child: const Text('Criar nova conta de Avaliador', style: TextStyle(color: Colors.amber)),
+                child: Text('Criar nova conta de Avaliador', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
               ),
             ],
           ),
