@@ -87,7 +87,6 @@ class PostoDetalhesSheet extends StatelessWidget {
     return ListenableBuilder(
       listenable: PostoRepository.instance,
       builder: (context, _) {
-        // Mescla dados do PostoRepository (se existir) com o posto vindo do Overpass
         final postoRepo = PostoRepository.instance.porId(postoId);
         final posto = postoRepo ?? postoInicial;
         if (posto == null) return const SizedBox.shrink();
@@ -106,7 +105,6 @@ class PostoDetalhesSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                // --- Alça de arrasto (Drag Handle) ---
                 Container(
                   margin: const EdgeInsets.only(top: 10, bottom: 6),
                   width: 42,
@@ -116,8 +114,6 @@ class PostoDetalhesSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-
-                // --- CABEÇALHO DO POSTO ---
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
                   child: Column(
@@ -168,8 +164,6 @@ class PostoDetalhesSheet extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // Endereço + Pílula de Distância
                       Row(
                         children: [
                           Icon(Icons.place_outlined,
@@ -224,8 +218,6 @@ class PostoDetalhesSheet extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // Botões de Navegação: Waze e Google Maps
                       Row(
                         children: [
                           Expanded(
@@ -280,8 +272,6 @@ class PostoDetalhesSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // --- BARRA DE ABAS (Qualidade | Avaliações | Medir) ---
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   padding: const EdgeInsets.all(4),
@@ -310,18 +300,11 @@ class PostoDetalhesSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // --- CONTEÚDO DAS ABAS ---
                 Expanded(
                   child: TabBarView(
                     children: [
-                      // ABA 1: Medições de Qualidade (Admin/Lab + Usuários)
                       _buildAbaMedicoes(context, posto, testes),
-
-                      // ABA 2: Avaliações de Motoristas
                       _buildAbaAvaliacoes(context, posto, avaliacoes, media),
-
-                      // ABA 3: Enviar Nova Medição ou Avaliação
                       _buildAbaFazerMedicao(context, posto),
                     ],
                   ),
@@ -343,7 +326,6 @@ class PostoDetalhesSheet extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
-        // Banner de Status Técnico
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -381,7 +363,6 @@ class PostoDetalhesSheet extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-
         if (testes.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
@@ -407,7 +388,6 @@ class PostoDetalhesSheet extends StatelessWidget {
           )
         else
           ...testes.map(_testeTile),
-
         if (PostoRepository.dadosDemonstracao) ...[
           const SizedBox(height: 12),
           Text(
@@ -461,7 +441,8 @@ class PostoDetalhesSheet extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => NovaAvaliacaoScreen(postoInicial: posto),
+                    // CORRIGIDO: mudou de postoInicial para posto
+                    builder: (_) => NovaAvaliacaoScreen(posto: posto),
                   ),
                 ),
                 style: FilledButton.styleFrom(
@@ -497,7 +478,6 @@ class PostoDetalhesSheet extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
-        // Card 1: Teste de Proveta / Laudo com Evidências (TestFormScreen)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -526,7 +506,7 @@ class PostoDetalhesSheet extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Calcule em tempo real o teor de Etanol Anidro na Gasolina C usando a fórmula oficial da ANP e anexe as fotos de evidência (proveta, nota fiscal e fachada).',
+                'Calcule em tempo real o teor de Etanol Anidro na Gasolina C usando a fórmula oficial da ANP e anexe as fotos de evidência.',
                 style: TextStyle(fontSize: 13, height: 1.35),
               ),
               const SizedBox(height: 14),
@@ -558,13 +538,12 @@ class PostoDetalhesSheet extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-
-        // Card 2: Registro Completo / Avaliação Comunitária (NovaAvaliacaoScreen)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _kCinzaFundo,
             borderRadius: BorderRadius.circular(16),
+            // CORRIGIDO: Removido o 'border:' inválido de dentro do Card e colocado via shape
             border: Border.all(color: Colors.grey.shade300),
           ),
           child: Column(
@@ -598,7 +577,8 @@ class PostoDetalhesSheet extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => NovaAvaliacaoScreen(postoInicial: posto),
+                        // CORRIGIDO: mudou de postoInicial para posto
+                        builder: (_) => NovaAvaliacaoScreen(posto: posto),
                       ),
                     );
                   },
@@ -644,7 +624,7 @@ class PostoDetalhesSheet extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
+        side: BorderSide(color: Colors.grey.shade300),
       ),
       child: ListTile(
         leading: CircleAvatar(
