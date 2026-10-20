@@ -1,278 +1,534 @@
+import 'dart:math' show cos, sqrt, asin;
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/posto_model.dart';
-import '../models/teste_combustivel_model.dart';
-import '../screens/nova_avaliacao_screen.dart';
-import '../services/posto_repository.dart';
-import 'status_visual.dart';
 
-final DateFormat _fmtData = DateFormat('dd/MM/yyyy');
+class PostoDetalhesSheet extends StatefulWidget {
+  final String nomePosto;
+  final String endereco;
+  final double postoLat;
+  final double postoLng;
+  final double? userLat;
+  final double? userLng;
+  final String statusConformidade; // 'conforme', 'atencao', 'reprovado', 'sem_dados'
+  final double? ultimoTeorEtanol;
+  final bool temLaudoAdmin;
+  final bool isAdmin;
+  final VoidCallback onAbrirFormularioTeste;
+  final VoidCallback onAbrirNovaAvaliacao;
 
-class PostoDetalhesSheet extends StatelessWidget {
   const PostoDetalhesSheet({
     super.key,
-    required this.postoId,
-    required this.scrollController,
-    this.posicaoUsuario,
+    required this.nomePosto,
+    required this.endereco,
+    required this.postoLat,
+    required this.postoLng,
+    this.userLat,
+    this.userLng,
+    required this.statusConformidade,
+    this.ultimoTeorEtanol,
+    this.temLaudoAdmin = false,
+    this.isAdmin = false,
+    required this.onAbrirFormularioTeste,
+    required this.onAbrirNovaAvaliacao,
   });
 
-  final String postoId;
-  final ScrollController scrollController;
-  final LatLng? posicaoUsuario;
+  @override
+  State<PostoDetalhesSheet> createState() => _PostoDetalhesSheetState();
+}
 
-  String? _distanciaTexto(Posto p) {
-    final u = posicaoUsuario;
-    if (u == null) return null;
-    final m = Geolocator.distanceBetween(
-        u.latitude, u.longitude, p.latitude, p.longitude);
-    return m < 1000 ? '${m.round()} m' : '${formatarNumero(m / 1000)} km';
+class _PostoDetalhesSheetState extends State<PostoDetalhesSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // Paleta Institucional Combustível SP (Light Mode: Branco, Cinza, Verde Escuro)
+  static const Color kDarkGreen = Color(0xFF1B5E20);
+  static const Color kLightGreenBg = Color(0xFFE8F5E9);
+  static const Color kSurfaceGrey = Color(0xFFF5F7F8);
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
   }
 
-  String _resumoStatus(Posto p) {
-    final u = p.ultimoTeste;
-    if (u == null) return 'Nenhum teste registrado para este posto.';
-    final dias = DateTime.now().difference(u.data).inDays;
-    if (p.status == StatusConformidade.semTeste) {
-      return 'Último teste há $dias dias (validade: '
-          '${ReferenciaConformidade.validadeDias} dias).';
-    }
-    return 'Último teste há $dias dias.';
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
-  Future<void> _abrir(BuildContext context, Uri uri) async {
-    var ok = false;
-    try {
-      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      ok = false;
+  /// Calcula a distância em km entre o usuário e o posto (Fórmula de Haversine)
+  String _calcularDistanciaTexto() {
+    if (widget.userLat == null || widget.userLng == null) {
+      return 'Localização GPS indisponível';
     }
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível abrir o aplicativo.')),
-      );
+    const p = 0.017453292519943295; // Math.PI / 180
+    final a = 0.5 -
+        cos((widget.postoLat - widget.userLat!) * p) / 2 +
+        cos(widget.userLat! * p) *
+            cos(widget.postoLat * p) *
+            (1 - cos((widget.postoLng - widget.userLng!) * p)) /
+            2;
+    final km = 12742 * asin(sqrt(a));
+    if (km < 1.0) {
+      return 'A ${(km * 1000).round()} m de você';
+    }
+    return 'A ${km.toStringAsFixed(1).replaceAll('.', ',')} km de você';
+  }
+
+  /// Abre rota diretamente no Waze ou Google Maps
+  Future<void> _abrirNavegacao({required bool usarWaze}) async {
+    final lat = widget.postoLat;
+    final lng = widget.postoLng;
+
+    final Uri appUri = usarWaze
+        ? Uri.parse('waze://?ll=$lat,$lng&navigate=yes')
+        : Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+
+    final Uri webFallbackUri = usarWaze
+        ? Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes')
+        : Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+
+    if (await canLaunchUrl(appUri)) {
+      await launchUrl(appUri, mode: LaunchMode.externalApplication);
+    } else {
+      await launchUrl(webFallbackUri, mode: LaunchMode.externalApplication);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: PostoRepository.instance,
-      builder: (context, _) {
-        final posto = PostoRepository.instance.porId(postoId);
-        if (posto == null) return const SizedBox.shrink();
-
-        final tema = Theme.of(context).textTheme;
-        final distancia = _distanciaTexto(posto);
-        final testes = posto.testesOrdenados.take(5).toList();
-        final avaliacoes = posto.avaliacoesOrdenadas.take(10).toList();
-        final media = posto.notaMedia;
-
-        return ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-          children: [
-            Text(posto.nome,
-                style: tema.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('Bandeira: ${posto.bandeira}', style: tema.bodyMedium),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.place_outlined, size: 18),
-                const SizedBox(width: 6),
-                Expanded(child: Text(posto.endereco)),
-              ],
-            ),
-            if (distancia != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.directions_car_outlined, size: 18),
-                  const SizedBox(width: 6),
-                  Text('$distancia de você'),
-                ],
+    return DraggableScrollableSheet(
+      initialChildSize: 0.58,
+      minChildSize: 0.40,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 16,
+                offset: Offset(0, -4),
               ),
             ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                StatusBadge(status: posto.status),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(_resumoStatus(posto), style: tema.bodySmall),
+          ),
+          child: Column(
+            children: [
+              // Puxador superior (Drag Handle)
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // ---- Testes
-            Text('Últimos testes',
-                style: tema.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (testes.isEmpty)
-              const Text('Ainda não há testes para este posto.')
-            else
-              ...testes.map(_testeTile),
-            const SizedBox(height: 20),
-            // ---- Avaliações
-            Row(
-              children: [
-                Text('Avaliações dos motoristas',
-                    style: tema.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (media == null)
-              const Text('Nenhuma avaliação ainda.')
-            else
-              Row(
-                children: [
-                  Text(formatarNumero(media),
-                      style: tema.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  _Estrelas(media, tamanho: 22),
-                  const SizedBox(width: 8),
-                  Text('(${posto.avaliacoes.length})'),
-                ],
               ),
-            const SizedBox(height: 8),
-            ...avaliacoes.map(_avaliacaoTile),
-            const SizedBox(height: 20),
-            // ---- Ações
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _abrir(
-                      context,
-                      Uri.parse(
-                          'https://waze.com/ul?ll=${posto.latitude},${posto.longitude}&navigate=yes'),
+
+              // CABEÇALHO DO POSTO
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.nomePosto,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.endereco,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildStatusBadge(),
+                      ],
                     ),
-                    icon: const Icon(Icons.navigation),
-                    label: const Text('Waze'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _abrir(
-                      context,
-                      Uri.parse(
-                          'https://www.google.com/maps/dir/?api=1&destination=${posto.latitude},${posto.longitude}&travelmode=driving'),
+                    const SizedBox(height: 12),
+
+                    // Pílula de Distância + Selo Oficial Admin
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: kSurfaceGrey,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.my_location, size: 15, color: kDarkGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                _calcularDistanciaTexto(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (widget.temLaudoAdmin)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: kLightGreenBg,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: kDarkGreen.withOpacity(0.3)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified, size: 15, color: kDarkGreen),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Laudo Oficial / Lab',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: kDarkGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Google Maps'),
-                  ),
+                    const SizedBox(height: 14),
+
+                    // BOTÕES DE NAVEGAÇÃO: GOOGLE MAPS & WAZE
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _abrirNavegacao(usarWaze: false),
+                            icon: const Icon(Icons.map_outlined, size: 18, color: kDarkGreen),
+                            label: const Text('Google Maps'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kDarkGreen,
+                              side: const BorderSide(color: kDarkGreen),
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _abrirNavegacao(usarWaze: true),
+                            icon: const Icon(Icons.navigation_outlined, size: 18, color: Color(0xFF0284C7)),
+                            label: const Text('Ir com Waze'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF0284C7),
+                              side: const BorderSide(color: Color(0xFF0284C7)),
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => NovaAvaliacaoScreen(postoInicial: posto),
-                  ),
-                ),
-                icon: const Icon(Icons.rate_review_outlined),
-                label: const Text('Registrar teste ou avaliação'),
               ),
-            ),
-            if (PostoRepository.dadosDemonstracao) ...[
+
               const SizedBox(height: 8),
-              Text(
-                'Dados de demonstração (fictícios). Não use para decisões reais.',
-                style: tema.bodySmall?.copyWith(color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
+
+              // ABAS INTERNAS DO CARD
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  color: kSurfaceGrey,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    color: kDarkGreen,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.grey.shade700,
+                  labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  tabs: const [
+                    Tab(text: 'Qualidade'),
+                    Tab(text: 'Avaliações'),
+                    Tab(text: 'Medir Agora'),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // CONTEÚDO DAS 3 ABAS
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAbaQualidade(scrollController),
+                    _buildAbaAvaliacoes(scrollController),
+                    _buildAbaNovaMedicao(scrollController),
+                  ],
+                ),
               ),
             ],
-          ],
+          ),
         );
       },
     );
   }
 
-  Widget _testeTile(TesteCombustivel t) {
-    final dens = t.densidade == null
-        ? 'Densidade não informada'
-        : 'Densidade ${formatarNumero(t.densidade!, 3)} g/cm³';
-    final partes = <String>[
-      dens,
-      t.fonte.rotulo,
-      _fmtData.format(t.data),
-      if (t.enviadoPor != null) 'por ${t.enviadoPor}',
-    ];
-    final subtitulo = partes.join(' • ') +
-        ((t.observacao != null && t.observacao!.isNotEmpty)
-            ? '\n${t.observacao}'
-            : '');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(t.status.icone, color: t.status.cor, size: 30),
-        title: Text(
-          '${t.combustivel.rotulo} • ${t.combustivel.rotuloTeor}: '
-          '${formatarNumero(t.percentualEtanol)}%',
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        subtitle: Text(subtitulo, style: const TextStyle(fontSize: 12.5)),
-        isThreeLine: t.observacao != null && t.observacao!.isNotEmpty,
-        trailing: StatusBadge(status: t.status, curto: true),
-      ),
-    );
-  }
+  Widget _buildStatusBadge() {
+    Color bgColor;
+    Color textColor;
+    String label;
+    IconData icon;
 
-  Widget _avaliacaoTile(Avaliacao a) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    switch (widget.statusConformidade) {
+      case 'conforme':
+        bgColor = const Color(0xFFDCFCE7);
+        textColor = const Color(0xFF15803D);
+        label = 'Conforme ANP';
+        icon = Icons.check_circle;
+        break;
+      case 'atencao':
+        bgColor = const Color(0xFFFEF9C3);
+        textColor = const Color(0xFFA16207);
+        label = 'Em Análise';
+        icon = Icons.warning_amber_rounded;
+        break;
+      case 'reprovado':
+        bgColor = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFFB91C1C);
+        label = 'Irregular';
+        icon = Icons.cancel;
+        break;
+      default:
+        bgColor = Colors.grey.shade200;
+        textColor = Colors.grey.shade700;
+        label = 'Sem Laudo';
+        icon = Icons.help_outline;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Text(a.autor,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              _Estrelas(a.nota.toDouble(), tamanho: 15),
-              const Spacer(),
-              Text(_fmtData.format(a.data),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            ],
-          ),
-          if (a.comentario.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(a.comentario),
+          Icon(icon, size: 16, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: textColor,
             ),
+          ),
         ],
       ),
     );
   }
-}
 
-class _Estrelas extends StatelessWidget {
-  const _Estrelas(this.nota, {this.tamanho = 18});
-  final double nota;
-  final double tamanho;
+  /// ABA 1: Qualidade do Combustível (Admin / Lab vs Comunidade)
+  Widget _buildAbaQualidade(ScrollController scrollController) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      children: [
+        // Card de Resumo Técnico (Teste de Proveta / Teor de Etanol)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kSurfaceGrey,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.science_outlined, color: kDarkGreen),
+                  SizedBox(width: 8),
+                  Text(
+                    'Teste de Proveta (Gasolina C)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.ultimoTeorEtanol != null
+                    ? 'Teor de Etanol Medido: ${widget.ultimoTeorEtanol!.toStringAsFixed(1)}%'
+                    : 'Nenhuma medição quantitativa aprovada ainda.',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Referência ANP: O teor de etanol anidro na gasolina comum/aditivada é calculado pela fórmula (V - 50) * 2 + 1 e validado com fotos da proveta.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Histórico de Laudos Verificados',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const CircleAvatar(
+            backgroundColor: kLightGreenBg,
+            child: Icon(Icons.verified_user, color: kDarkGreen),
+          ),
+          title: const Text('Medição Técnica Verificada'),
+          subtitle: const Text('Evidências fotográficas (proveta e cupom) auditadas'),
+          trailing: Text(
+            widget.ultimoTeorEtanol != null ? '${widget.ultimoTeorEtanol!.toStringAsFixed(0)}%' : '--',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkGreen),
+          ),
+        ),
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (i) {
-        final icone = nota >= i + 1
-            ? Icons.star
-            : (nota >= i + 0.5 ? Icons.star_half : Icons.star_border);
-        return Icon(icone, size: tamanho, color: const Color(0xFFF2B600));
-      }),
+  /// ABA 2: Avaliações Qualitativas do Posto
+  Widget _buildAbaAvaliacoes(ScrollController scrollController) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      children: [
+        ElevatedButton.icon(
+          onPressed: widget.onAbrirNovaAvaliacao,
+          icon: const Icon(Icons.star_outline),
+          label: const Text('Avaliar Atendimento e Confiança'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kDarkGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Relatos da Comunidade',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Veja o que outros motoristas de São Paulo relataram sobre este posto.',
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        ),
+      ],
+    );
+  }
+
+  /// ABA 3: Enviar Medição (Colaboração Usuário ou Laudo Admin)
+  Widget _buildAbaNovaMedicao(ScrollController scrollController) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kLightGreenBg,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.biotech, color: kDarkGreen, size: 24),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.isAdmin
+                          ? 'Registrar Laudo Oficial / Laboratório (Admin)'
+                          : 'Enviar Teste Colaborativo de Combustível',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: kDarkGreen,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '1. Faça o teste da proveta (50ml combustível + 50ml solução aquosa).\n'
+                '2. Tire foto da proveta na altura da leitura, do cupom fiscal e da fachada.\n'
+                '3. O sistema calcula automaticamente o teor de etanol.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onAbrirFormularioTeste,
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: Text(
+                    widget.isAdmin
+                        ? 'Publicar Laudo Técnico Agora'
+                        : 'Iniciar Medição com Fotos',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kDarkGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
